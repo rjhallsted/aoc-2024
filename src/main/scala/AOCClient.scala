@@ -1,20 +1,19 @@
 import zio._
 import zio.http._
-import zio.http.model.{Headers, Cookie}
 
 object AOCClient {
-    type Res[U] = RIO[Client, U]
+    type Res[U] = RIO[Client & Scope, U]
     
     def getInput(day: Int): Res[String] = {
-        val url = s"https://adventofcode.com/2022/day/$day/input"
+        val url = s"https://adventofcode.com/2023/day/$day/input"
 
-        val headers = sys.env.get("AOC_SESSION_KEY").map(sessionKey => {
-            Headers.cookie(Cookie(name = "session", content = sessionKey, target = Cookie.Type.request))
-        })
+        val cookie = sys.env.get("AOC_SESSION_KEY").map(sessionKey => Cookie.Request("session", sessionKey))
 
         for {
-            headers <- ZIO.getOrFail(headers)
-            res <- Client.request(url, headers = headers)
+            sessionCookie <- ZIO.getOrFail(cookie)
+            cookieHeader <- ZIO.succeed(Header.Cookie(NonEmptyChunk(sessionCookie)))
+            req <- ZIO.succeed(Request.get(url).addHeader(cookieHeader))
+            res <- ZClient.request(req)
             body <- res.body.asString
         } yield body
     }
